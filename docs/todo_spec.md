@@ -94,10 +94,7 @@ TODO アプリ 要件定義
 
 7. リポジトリ構成（前提）
 
-/frontend # フロントエンド（追加する場合こちら）
-/backend
+/backend # バックエンド（NestJS + AWS Lambda）
+/docs # 仕様/設計ドキュメント（todo_spec.md, er.md など）
 /infra # AWS CDK / IaC 定義
-/.local
-todo.sqlite # ローカル開発用 sqlite DB（Git 管理外）
-todo_spec.md
-readme.md
+/.local # ローカル環境用設定（Git 管理外を想定）
