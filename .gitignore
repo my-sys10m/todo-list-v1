@@ -205,3 +205,8 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# CDK Context & Staging files
+cdk.context.json
+.cdk.staging/
+cdk.out/
