@@ -1,9 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { sampleTable } from '../../schemas/sample';
 import { DRIZZLE_DB } from '../../database/database.tokens';
-import { SampleEntity } from './todos.entity';
 
 @Injectable()
 export class TodosRepository {
@@ -12,21 +9,66 @@ export class TodosRepository {
     private readonly db: BetterSQLite3Database,
   ) {}
 
-  getSample(): SampleEntity {
-    const rows = this.db
-      .select()
-      .from(sampleTable)
-      .where(eq(sampleTable.id, 1))
-      .limit(1)
-      .all();
-
-    if (!rows.length || !rows[0].objects) {
-      throw new Error('Sample data not found');
-    }
-
+  async insertTodo(data: { projectId: string; userId: string; title: string; status?: number }) {
+    // TODO: implement INSERT using drizzle schema (t_todo)
     return {
-      id: rows[0].id,
-      objects: rows[0].objects,
+      id: 'todo-id',
+      projectId: data.projectId,
+      userId: data.userId,
+      title: data.title,
+      status: data.status ?? 0,
+      isDeleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
+  }
+
+  async findById(id: string, userId: string) {
+    // TODO: SELECT ... WHERE id/userId/is_deleted=false
+    return {
+      id,
+      projectId: 'project-id',
+      userId,
+      title: 'todo',
+      status: 0,
+      isDeleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async queryByUser(userId: string, date?: string) {
+    // TODO: SELECT list with optional date range
+    return [
+      {
+        id: 'todo-id',
+        projectId: 'project-id',
+        userId,
+        title: 'todo',
+        status: 0,
+        isDeleted: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+    ];
+  }
+
+  async updateById(id: string, userId: string, dto: any) {
+    // TODO: UPDATE ... WHERE id/userId
+    return {
+      id,
+      projectId: 'project-id',
+      userId,
+      title: dto.title ?? 'todo',
+      status: dto.status ?? 0,
+      isDeleted: dto.isDeleted ?? false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async softDelete(id: string, userId: string) {
+    // TODO: UPDATE is_deleted=true WHERE id/userId
+    return true;
   }
 }
