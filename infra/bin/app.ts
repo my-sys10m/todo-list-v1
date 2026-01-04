@@ -9,7 +9,9 @@ const firebaseProjectId =
   process.env.FIREBASE_PROJECT_ID ??
   'dummy-firebase-project';
 const frontendOrigin =
-  app.node.tryGetContext('frontendOrigin') ?? process.env.FRONTEND_ORIGIN ?? 'http://localhost';
+  app.node.tryGetContext('frontendOrigin') ??
+  process.env.FRONTEND_ORIGIN ??
+  'http://localhost:5173,https://todo-list-v0-4a7a2.web.app';
 
 // Prefer explicit env when available; otherwise fall back to CDK default resolution.
 const env = {

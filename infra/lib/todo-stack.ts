@@ -4,6 +4,7 @@ import { HttpApiGateway } from './api-gateway';
 import { LambdaFunction } from './lambda';
 import { AppVpc } from './vpc';
 import { EfsFileSystem } from './efs';
+import { FirebaseJwtAuthorizer } from './auth';
 import * as efs from 'aws-cdk-lib/aws-efs';
 import * as lambdaIntegrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as apigwv2 from 'aws-cdk-lib/aws-apigatewayv2';
@@ -14,6 +15,8 @@ export interface TodoStackProps extends cdk.StackProps {
   readonly sqlitePath: string;
   readonly lambdaCodePath: string;
   readonly lambdaHandler: string;
+  readonly migrationHandler?: string;
+  readonly migrationFunctionName?: string;
 }
 
 export class TodoStack extends cdk.Stack {
@@ -51,6 +54,22 @@ export class TodoStack extends cdk.Stack {
       },
     });
 
+    const migrationFunction = new LambdaFunction(this, 'MigrationLambda', {
+      vpc: vpc.vpc,
+      securityGroup: vpc.lambdaSecurityGroup,
+      accessPoint,
+      codePath: props.lambdaCodePath,
+      handler: props.migrationHandler ?? 'dist/migration.handler',
+      functionName: props.migrationFunctionName ?? 'todo-migration',
+      mountPath: '/mnt/efs',
+      timeoutSeconds: 30,
+      environment: {
+        SQLITE_PATH: props.sqlitePath,
+        MIGRATION_SOURCE_DIR: '/var/task/db/drizzle',
+        MIGRATION_HISTORY_PATH: '/tmp/db/migration/migration_history.csv',
+      },
+    });
+
     const allowedOrigins = props.frontendOrigin
       .split(',')
       .map((origin) => origin.trim())
@@ -62,6 +81,19 @@ export class TodoStack extends cdk.Stack {
 
     const api = new HttpApiGateway(this, 'TodoHttpApi', {
       allowedOrigins,
+      corsHeaders: ['Authorization', 'Content-Type', 'Accept'],
+      corsMethods: [
+        apigwv2.CorsHttpMethod.GET,
+        apigwv2.CorsHttpMethod.POST,
+        apigwv2.CorsHttpMethod.PUT,
+        apigwv2.CorsHttpMethod.PATCH,
+        apigwv2.CorsHttpMethod.DELETE,
+        apigwv2.CorsHttpMethod.OPTIONS,
+      ],
+    });
+
+    const authorizer = new FirebaseJwtAuthorizer(this, 'FirebaseJwtAuthorizer', {
+      firebaseProjectId: props.firebaseProjectId,
     });
 
     const integration = new lambdaIntegrations.HttpLambdaIntegration(
@@ -73,27 +105,59 @@ export class TodoStack extends cdk.Stack {
       path: '/todos',
       methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST],
       integration,
-      // TODO: re-enable Firebase JWT authorizer when hello endpoint testing is done
-      // authorizer: authorizer.authorizer,
+      authorizer: authorizer.authorizer,
+    });
+
+    api.httpApi.addRoutes({
+      path: '/todos/search',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer: authorizer.authorizer,
     });
 
     api.httpApi.addRoutes({
       path: '/todos/{id}',
       methods: [apigwv2.HttpMethod.PATCH, apigwv2.HttpMethod.DELETE],
       integration,
-      // authorizer: authorizer.authorizer,
+      authorizer: authorizer.authorizer,
+    });
+
+    api.httpApi.addRoutes({
+      path: '/projects',
+      methods: [apigwv2.HttpMethod.POST],
+      integration,
+      authorizer: authorizer.authorizer,
+    });
+
+    api.httpApi.addRoutes({
+      path: '/projects/{id}',
+      methods: [apigwv2.HttpMethod.PATCH, apigwv2.HttpMethod.DELETE],
+      integration,
+      authorizer: authorizer.authorizer,
+    });
+
+    api.httpApi.addRoutes({
+      path: '/users/projects',
+      methods: [apigwv2.HttpMethod.GET],
+      integration,
+      authorizer: authorizer.authorizer,
     });
 
     api.httpApi.addRoutes({
       path: '/hello',
       methods: [apigwv2.HttpMethod.GET],
       integration,
-      // authorizer: authorizer.authorizer,
+      authorizer: authorizer.authorizer,
     });
 
     new cdk.CfnOutput(this, 'HttpApiEndpoint', {
       value: api.httpApi.apiEndpoint,
       description: 'Invoke URL for the TODO HTTP API.',
+    });
+
+    new cdk.CfnOutput(this, 'MigrationFunctionName', {
+      value: migrationFunction.fn.functionName,
+      description: 'Lambda function name for running database migrations.',
     });
   }
 }

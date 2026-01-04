@@ -7,7 +7,17 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
-  app.enableCors({ origin: process.env.FRONTEND_ORIGIN?.split(',') ?? true });
+  const allowedOrigins =
+    process.env.FRONTEND_ORIGIN?.split(',').map((o) => o.trim()).filter((o) => o.length > 0) ?? [
+      'http://localhost:5173',
+      'https://todo-list-v0-4a7a2.web.app',
+    ];
+  app.enableCors({
+    origin: allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    credentials: true,
+  });
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Todo API')

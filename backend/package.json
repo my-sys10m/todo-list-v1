@@ -8,6 +8,8 @@
     "start:dev": "ts-node src/main.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest",
+    "migrate": "node scripts/migrate.js",
+    "deploy": "npm run build && npm run migrate",
     "postinstall": "npm rebuild better-sqlite3"
   },
   "dependencies": {
@@ -53,6 +55,7 @@
     "@types/node": "^20.0.0",
     "eslint": "^8.57.0",
     "prettier": "^3.0.0",
+    "drizzle-kit": "^0.24.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.0",
     "vitest": "^1.4.0"

@@ -14,6 +14,7 @@ export interface LambdaFunctionProps {
   readonly timeoutSeconds?: number;
   readonly accessPoint?: efs.IAccessPoint;
   readonly mountPath?: string;
+  readonly functionName?: string;
 }
 
 // Generic Lambda wrapper; EFS mount, envs, and time/memory are configurable.
@@ -27,6 +28,7 @@ export class LambdaFunction extends Construct {
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: props.handler,
       code: lambda.Code.fromAsset(props.codePath),
+      functionName: props.functionName,
       vpc: props.vpc,
       securityGroups: [props.securityGroup],
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_ISOLATED },

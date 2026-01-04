@@ -7,6 +7,7 @@ import { DRIZZLE_DB, SQLITE_CONNECTION } from './database.tokens';
 
 const defaultDbPath = path.resolve(__dirname, '..', '..', 'db', 'todo.sqlite');
 
+/** SQLite 接続と drizzle クライアントを提供するグローバルモジュール。 */
 @Global()
 @Module({
   providers: [
