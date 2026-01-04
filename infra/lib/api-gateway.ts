@@ -17,16 +17,19 @@ export class HttpApiGateway extends Construct {
     this.httpApi = new apigwv2.HttpApi(this, 'HttpApi', {
       corsPreflight: props?.allowedOrigins
         ? {
-            allowHeaders: props.corsHeaders ?? ['Authorization', 'Content-Type'],
+            allowHeaders: props.corsHeaders ?? ['Authorization', 'Content-Type', 'Accept'],
             allowMethods:
               props.corsMethods ??
               [
                 apigwv2.CorsHttpMethod.GET,
                 apigwv2.CorsHttpMethod.POST,
+                apigwv2.CorsHttpMethod.PUT,
                 apigwv2.CorsHttpMethod.PATCH,
                 apigwv2.CorsHttpMethod.DELETE,
+                apigwv2.CorsHttpMethod.OPTIONS,
               ],
             allowOrigins: props.allowedOrigins,
+            allowCredentials: true,
           }
         : undefined,
     });

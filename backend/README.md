@@ -33,6 +33,51 @@ npm run build && npm start
 npm test
 ```
 
+## マイグレーション（EFS 上の SQLite）
+- 対象: `db/migration/*.sql`（なければ `db/drizzle/*.sql`）を順番に適用し、`db/migration/migration_history.csv` に履歴を追記（履歴はパッケージ内ではなく `/tmp` に生成される）
+- 実行主体: マイグレーション用 Lambda（`todo-migration`）。EFS をマウントし、`SQLITE_PATH` を参照して apply します。
+- 実行方法  
+ 1) デプロイ済みの Lambda に対して AWS CLI が使える環境で  
+    ```bash
+    cd backend
+    export MIGRATION_FUNCTION_NAME=todo-migration   # .env でも可
+    npm run migrate
+    ```  
+    ※ `aws` CLI の資格情報が必要。出力は `MIGRATION_OUTPUT_FILE`（既定 `/tmp/migration-output.json`）に保存されます。
+ 2) デプロイ前提: `infra` で CDK を実行し、`MigrationFunctionName` 出力を確認
+- 仕組み  
+  - Lambda ハンドラー: `dist/migration.handler`（ソース `src/migration.ts`）  
+  - 環境変数:  
+    - `SQLITE_PATH`（既定 `/mnt/efs/todo.db`）  
+    - `MIGRATION_SOURCE_DIR`（既定 `/var/task/db/migration` があればそこ、なければ `/var/task/db/drizzle` を参照）  
+    - `MIGRATION_HISTORY_PATH`（既定 `/tmp/db/migration/migration_history.csv`。相対パス指定時も `/tmp` 配下に解決）  
+  - 未適用の SQL ファイルのみ実行し、成功後に `migration_history.csv` に `migration_name,migrated_date` 形式で追記
+
+## ローカルマイグレーション（Drizzle Kit）
+- 目的: ローカル SQLite（既定 `./db/todo.sqlite`。`.env` の `SQLITE_PATH` で変更可）に対して Drizzle Kit でマイグレーションを生成・適用する。
+- 前提: dev 依存に `drizzle-kit` を追加し、`backend/drizzle.config.ts` を用意する。
+  ```bash
+  cd backend
+  npm install --save-dev drizzle-kit
+  cat > drizzle.config.ts <<'EOF'
+  import { defineConfig } from 'drizzle-kit';
+
+  export default defineConfig({
+    schema: './src/schemas/**/*.ts',
+    out: './db/drizzle',
+    dialect: 'sqlite',
+    dbCredentials: { url: process.env.SQLITE_PATH ?? './db/todo.sqlite' },
+  });
+  EOF
+  ```
+- よく使うコマンド  
+  - マイグレーション生成: `cd backend && npx drizzle-kit generate:sqlite`  
+    - `src/schemas` の差分から `db/drizzle/*.sql` を生成し、`meta/_journal.json` も更新。  
+  - ローカル DB へ適用: `cd backend && npx drizzle-kit push:sqlite`  
+    - `SQLITE_PATH` で指定した SQLite に適用される。  
+  - 差分確認（任意）: `cd backend && npx drizzle-kit studio`
+- 生成された `db/drizzle` 配下は AWS のマイグレーション Lambda にも同梱するので、リポジトリにコミットする。
+
 ## 手動デプロイ（Lambda 用アセットを一発で作る）
 ### 1) Linux/x64 で `deploy/` を作成（better-sqlite3 を Lambda 向けにビルド）
 Linux ホストならそのまま、macOS/Windows は次の Docker 例を使う。
@@ -47,6 +92,7 @@ mkdir deploy
 cp package.json deploy/
 [ -f package-lock.json ] && cp package-lock.json deploy/
 cp -R dist deploy/
+cp -R db deploy/                  # マイグレーション SQL (db/migration or db/drizzle) を Lambda に同梱する
 npm ci --omit=dev --prefix deploy # runtime 依存だけを deploy/node_modules に展開（package-lock.json 前提）
 ```
 
@@ -75,6 +121,7 @@ docker run --rm \
     mkdir deploy
     cp package.json package-lock.json deploy/
     cp -R dist deploy/
+    cp -R db deploy/
     npm ci --omit=dev --prefix deploy
     npm rebuild better-sqlite3 --prefix deploy --build-from-source
     file deploy/node_modules/better-sqlite3/build/Release/better_sqlite3.node
