@@ -19,9 +19,10 @@ export class CurrentUserMiddleware implements NestMiddleware {
     const decodedPayload = decodeJwtPayload(token);
     const payloadSub = typeof decodedPayload?.sub === 'string' ? decodedPayload.sub : undefined;
     let sub = payloadSub;
-    // ローカル開発環境では JWT を通さないためモックユーザーを付与する。
-    if (!sub && process.env.NODE_ENV !== 'production') {
-      sub = process.env.MOCK_USER_ID ?? 'local-user';
+    const allowMock = process.env.ALLOW_MOCK_USER === 'true';
+    // 明示的なフラグがあるときだけモックユーザーを付与する。
+    if (!sub && allowMock) {
+      sub = process.env.MOCK_USER_ID;
     }
     if (sub) {
       req.user = { sub };
