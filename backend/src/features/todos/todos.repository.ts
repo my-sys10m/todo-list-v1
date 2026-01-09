@@ -34,7 +34,7 @@ export class TodosRepository {
   ) {}
 
   /** TODO を新規作成し永続化済みエンティティを返す。 */
-  async insertTodo(data: {
+  insertTodo(data: {
     projectId: string;
     userId: string;
     title: string;
@@ -54,35 +54,35 @@ export class TodosRepository {
       createdAt,
       updatedAt,
     };
-    const row = await this.db.insert(todosTable).values(values).returning().get();
+    const row = this.db.insert(todosTable).values(values).returning().get();
     if (!row) {
       throw new Error('failed to insert todo');
     }
-    return this.mapTodo(row);
+    return Promise.resolve(this.mapTodo(row));
   }
 
   /** ユーザー所有の指定 ID の TODO を 1 件取得する。 */
-  async findById(id: string, userId: string): Promise<TodoEntity | null> {
-    const row = await this.db
+  findById(id: string, userId: string): Promise<TodoEntity | null> {
+    const row = this.db
       .select()
       .from(todosTable)
       .where(and(eq(todosTable.id, Number(id)), eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)))
       .get();
-    return row ? this.mapTodo(row) : null;
+    return Promise.resolve(row ? this.mapTodo(row) : null);
   }
 
   /** ユーザーの TODO 一覧を日付フィルタ込みで取得する。 */
-  async queryByUser(userId: string, date?: string): Promise<TodoEntity[]> {
+  queryByUser(userId: string, date?: string): Promise<TodoEntity[]> {
     const where = [eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)];
     if (date) {
       where.push(like(todosTable.createdAt, `${date}%`));
     }
-    const rows = await this.db.select().from(todosTable).where(and(...where)).all();
-    return rows.map(this.mapTodo);
+    const rows = this.db.select().from(todosTable).where(and(...where)).all();
+    return Promise.resolve(rows.map(this.mapTodo));
   }
 
   /** 条件付き検索を実行し、最大 limit 件を取得する。 */
-  async search(
+  search(
     userId: string,
     filters: {
       title?: string;
@@ -113,12 +113,12 @@ export class TodosRepository {
     if (filters.updatedTo) {
       where.push(lte(todosTable.updatedAt, filters.updatedTo));
     }
-    const rows = await this.db.select().from(todosTable).where(and(...where)).limit(limit).all();
-    return rows.map(this.mapTodo);
+    const rows = this.db.select().from(todosTable).where(and(...where)).limit(limit).all();
+    return Promise.resolve(rows.map(this.mapTodo));
   }
 
   /** TODO を部分更新し更新済みエンティティを返す。 */
-  async updateById(id: string, userId: string, dto: TodoUpdateInput): Promise<TodoEntity | null> {
+  updateById(id: string, userId: string, dto: TodoUpdateInput): Promise<TodoEntity | null> {
     const updateValues: Partial<TodoInsert> = { updatedAt: new Date().toISOString() };
     if (dto.title !== undefined) {
       updateValues.title = dto.title;
@@ -129,23 +129,23 @@ export class TodosRepository {
     if (dto.isDeleted !== undefined) {
       updateValues.isDeleted = dto.isDeleted;
     }
-    const row = await this.db
+    const row = this.db
       .update(todosTable)
       .set(updateValues)
       .where(and(eq(todosTable.id, Number(id)), eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)))
       .returning()
       .get();
-    return row ? this.mapTodo(row) : null;
+    return Promise.resolve(row ? this.mapTodo(row) : null);
   }
 
   /** TODO を論理削除としてフラグ更新し、成功可否を返す。 */
-  async softDelete(id: string, userId: string): Promise<boolean> {
-    const result = await this.db
+  softDelete(id: string, userId: string): Promise<boolean> {
+    const result = this.db
       .update(todosTable)
       .set({ isDeleted: true, updatedAt: new Date().toISOString() })
       .where(and(eq(todosTable.id, Number(id)), eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)))
       .run();
-    return result.changes > 0;
+    return Promise.resolve(result.changes > 0);
   }
 
   private mapTodo = (row: TodoRow): TodoEntity => ({

@@ -25,7 +25,7 @@ export class ProjectsRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: BetterSQLite3Database) {}
 
   /** 指定ユーザーに紐づくプロジェクトを新規作成する。 */
-  async insertProject(data: { userId: string; name: string; createdAt?: string; updatedAt?: string }): Promise<ProjectEntity> {
+  insertProject(data: { userId: string; name: string; createdAt?: string; updatedAt?: string }): Promise<ProjectEntity> {
     const now = new Date().toISOString();
     const createdAt = data.createdAt ?? now;
     const updatedAt = data.updatedAt ?? createdAt;
@@ -35,58 +35,58 @@ export class ProjectsRepository {
       createdAt,
       updatedAt,
     };
-    const row = await this.db.insert(projectsTable).values(values).returning().get();
+    const row = this.db.insert(projectsTable).values(values).returning().get();
     if (!row) {
       throw new Error('failed to insert project');
     }
-    return this.mapProject(row);
+    return Promise.resolve(this.mapProject(row));
   }
 
   /** プロジェクト名を更新し、更新後のレコードを返す。 */
-  async updateProject(id: string, userId: string, dto: ProjectUpdateInput): Promise<ProjectEntity | null> {
+  updateProject(id: string, userId: string, dto: ProjectUpdateInput): Promise<ProjectEntity | null> {
     const updateValues: Partial<ProjectInsert> = { updatedAt: new Date().toISOString() };
     if (dto.name !== undefined) {
       updateValues.name = dto.name;
     }
-    const row = await this.db
+    const row = this.db
       .update(projectsTable)
       .set(updateValues)
       .where(and(eq(projectsTable.id, Number(id)), eq(projectsTable.userId, userId)))
       .returning()
       .get();
-    return row ? this.mapProject(row) : null;
+    return Promise.resolve(row ? this.mapProject(row) : null);
   }
 
   /** プロジェクト削除を実行し削除可否を返す。 */
-  async softDelete(id: string, userId: string): Promise<boolean> {
-    const result = await this.db.delete(projectsTable).where(and(eq(projectsTable.id, Number(id)), eq(projectsTable.userId, userId))).run();
-    return result.changes > 0;
+  softDelete(id: string, userId: string): Promise<boolean> {
+    const result = this.db.delete(projectsTable).where(and(eq(projectsTable.id, Number(id)), eq(projectsTable.userId, userId))).run();
+    return Promise.resolve(result.changes > 0);
   }
 
   /** ユーザーに紐づく指定 ID のプロジェクトを取得する。 */
-  async findById(id: string, userId: string): Promise<ProjectEntity | null> {
-    const row = await this.db
+  findById(id: string, userId: string): Promise<ProjectEntity | null> {
+    const row = this.db
       .select()
       .from(projectsTable)
       .where(and(eq(projectsTable.id, Number(id)), eq(projectsTable.userId, userId)))
       .get();
-    return row ? this.mapProject(row) : null;
+    return Promise.resolve(row ? this.mapProject(row) : null);
   }
 
   /** ユーザー ID とプロジェクト名の組み合わせでプロジェクトを取得する。 */
-  async findByName(userId: string, name: string): Promise<ProjectEntity | null> {
-    const row = await this.db
+  findByName(userId: string, name: string): Promise<ProjectEntity | null> {
+    const row = this.db
       .select()
       .from(projectsTable)
       .where(and(eq(projectsTable.userId, userId), eq(projectsTable.name, name)))
       .get();
-    return row ? this.mapProject(row) : null;
+    return Promise.resolve(row ? this.mapProject(row) : null);
   }
 
   /** ユーザー配下の全プロジェクト一覧を取得する。 */
-  async listByUser(userId: string): Promise<ProjectEntity[]> {
-    const rows = await this.db.select().from(projectsTable).where(eq(projectsTable.userId, userId)).all();
-    return rows.map(this.mapProject);
+  listByUser(userId: string): Promise<ProjectEntity[]> {
+    const rows = this.db.select().from(projectsTable).where(eq(projectsTable.userId, userId)).all();
+    return Promise.resolve(rows.map(this.mapProject));
   }
 
   private mapProject = (row: ProjectRow): ProjectEntity => ({

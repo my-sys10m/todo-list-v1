@@ -1,7 +1,10 @@
 import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiConflictResponse, ApiCreatedResponse, ApiNoContentResponse, ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Request } from 'express';
 import { CreateProjectDto, ProjectListResponseDto, ProjectResponseDto, UpdateProjectDto } from './projects.dto';
 import { ProjectsService } from './projects.service';
+
+type AuthedRequest = Request & { user?: { sub: string } };
 
 /** プロジェクト API を公開するコントローラ。 */
 @ApiTags('projects')
@@ -15,7 +18,7 @@ export class ProjectsController {
   @ApiOperation({ summary: 'Create Project' })
   @ApiCreatedResponse({ type: ProjectResponseDto })
   @ApiConflictResponse()
-  create(@Req() req: any, @Body() dto: CreateProjectDto) {
+  create(@Req() req: AuthedRequest, @Body() dto: CreateProjectDto) {
     console.log('ProjectsController.create called');
     const userId = req.user?.sub;
     if (!userId) throw new ForbiddenException();
@@ -26,7 +29,7 @@ export class ProjectsController {
   @Patch('projects/:id')
   @ApiOperation({ summary: 'Update Project' })
   @ApiOkResponse({ type: ProjectResponseDto })
-  update(@Req() req: any, @Param('id') id: string, @Body() dto: UpdateProjectDto) {
+  update(@Req() req: AuthedRequest, @Param('id') id: string, @Body() dto: UpdateProjectDto) {
     const userId = req.user?.sub;
     if (!userId) throw new ForbiddenException();
     return this.projectsService.update(userId, id, dto);
@@ -36,7 +39,7 @@ export class ProjectsController {
   @Delete('projects/:id')
   @ApiOperation({ summary: 'Delete Project' })
   @ApiNoContentResponse()
-  remove(@Req() req: any, @Param('id') id: string) {
+  remove(@Req() req: AuthedRequest, @Param('id') id: string) {
     const userId = req.user?.sub;
     if (!userId) throw new ForbiddenException();
     return this.projectsService.remove(userId, id);
@@ -46,7 +49,7 @@ export class ProjectsController {
   @Get('users/projects')
   @ApiOperation({ summary: 'List projects for current user' })
   @ApiOkResponse({ type: ProjectListResponseDto })
-  listByUser(@Req() req: any) {
+  listByUser(@Req() req: AuthedRequest) {
     const userId = req.user?.sub;
     if (!userId) throw new ForbiddenException();
     return this.projectsService.listByUser(userId);

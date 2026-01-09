@@ -38,7 +38,11 @@ const decodeJwtPayload = (token?: string): Record<string, unknown> | undefined =
   const normalized = payload.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(payload.length / 4) * 4, '=');
   try {
     const json = Buffer.from(normalized, 'base64').toString('utf-8');
-    return JSON.parse(json);
+    const parsed: unknown = JSON.parse(json);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+    return undefined;
   } catch {
     return undefined;
   }
