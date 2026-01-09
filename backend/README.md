@@ -33,6 +33,19 @@ npm run build && npm start
 npm test
 ```
 
+## Lint（開発時の品質チェック）
+- 依存を最新化したら `cd backend && npm install` を実行して ESLint 周りの dev 依存を取得。
+- チェックのみ:  
+  ```bash
+  cd backend
+  npm run lint
+  ```
+- 自動修正込み:  
+  ```bash
+  cd backend
+  npm run lint:fix
+  ```
+
 ## マイグレーション（EFS 上の SQLite）
 - 対象: `db/migration/*.sql`（なければ `db/drizzle/*.sql`）を順番に適用し、`db/migration/migration_history.csv` に履歴を追記（履歴はパッケージ内ではなく `/tmp` に生成される）
 - 実行主体: マイグレーション用 Lambda（`todo-migration`）。EFS をマウントし、`SQLITE_PATH` を参照して apply します。

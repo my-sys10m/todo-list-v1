@@ -1,9 +1,9 @@
 import 'reflect-metadata';
 import Database from 'better-sqlite3';
 import { BadRequestException, ForbiddenException, NotFoundException, ValidationPipe } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { ProjectsRepository } from '../projects/projects.repository';
 import { CreateTodoDto, SearchTodoQueryDto, TodoStatus } from './todos.dto';
 import { TodosController } from './todos.controller';
@@ -13,12 +13,13 @@ import { TodosService } from './todos.service';
 describe('create todo', () => {
   describe('TodosController.create', () => {
     it('returns created todo for authenticated user', async () => {
+      const create = vi.fn().mockResolvedValue({ id: '1' });
       const mockService = {
-        create: vi.fn().mockResolvedValue({ id: '1' }),
+        create,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.create({ user: { sub: 'user-1' } }, { projectId: '1', title: 'Task' } as CreateTodoDto);
-      expect(mockService.create).toHaveBeenCalledWith('user-1', { projectId: '1', title: 'Task' });
+      expect(create).toHaveBeenCalledWith('user-1', { projectId: '1', title: 'Task' });
       expect(result).toEqual({ id: '1' });
     });
 
@@ -56,16 +57,18 @@ describe('create todo', () => {
   });
 
   describe('TodosService.create', () => {
+    const findProjectById = vi.fn();
+    const insertTodo = vi.fn();
     const projectRepo = {
-      findById: vi.fn(),
+      findById: findProjectById,
     } as unknown as ProjectsRepository;
     const todosRepo = {
-      insertTodo: vi.fn(),
+      insertTodo,
     } as unknown as TodosRepository;
     const service = new TodosService(todosRepo, projectRepo);
 
     it('creates todo when project exists', async () => {
-      projectRepo.findById = vi.fn().mockResolvedValue({ id: '1' });
+      findProjectById.mockResolvedValue({ id: '1' });
       const todoEntity: TodoEntity = {
         id: '1',
         projectId: '1',
@@ -76,12 +79,12 @@ describe('create todo', () => {
         createdAt: 'now',
         updatedAt: 'now',
       };
-      todosRepo.insertTodo = vi.fn().mockResolvedValue(todoEntity);
+      insertTodo.mockResolvedValue(todoEntity);
 
       const result = await service.create('user-1', { projectId: '1', title: 'Task', status: TodoStatus.InProgress });
 
-      expect(projectRepo.findById).toHaveBeenCalledWith('1', 'user-1');
-      expect(todosRepo.insertTodo).toHaveBeenCalledWith(
+      expect(findProjectById).toHaveBeenCalledWith('1', 'user-1');
+      expect(insertTodo).toHaveBeenCalledWith(
         expect.objectContaining({
           projectId: '1',
           title: 'Task',
@@ -102,7 +105,7 @@ describe('create todo', () => {
     });
 
     it('throws when project is missing', async () => {
-      projectRepo.findById = vi.fn().mockResolvedValue(null);
+      findProjectById.mockResolvedValue(null);
       await expect(service.create('user-1', { projectId: '2', title: 'Task' })).rejects.toThrow('project not found');
     });
   });
@@ -138,8 +141,8 @@ describe('create todo', () => {
         new Date().toISOString(),
         new Date().toISOString(),
       );
-      const db = drizzle(sqlite);
-      repo = new TodosRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new TodosRepository(db);
     });
 
     it('inserts todo with explicit status', async () => {
@@ -180,12 +183,13 @@ describe('create todo', () => {
 describe('find one todo', () => {
   describe('TodosController.findOne', () => {
     it('returns todo for authenticated user', async () => {
+      const findOne = vi.fn().mockResolvedValue({ id: '1' });
       const mockService = {
-        findOne: vi.fn().mockResolvedValue({ id: '1' }),
+        findOne,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.findOne({ user: { sub: 'user-1' } }, '1');
-      expect(mockService.findOne).toHaveBeenCalledWith('user-1', '1');
+      expect(findOne).toHaveBeenCalledWith('user-1', '1');
       expect(result).toEqual({ id: '1' });
     });
 
@@ -197,8 +201,9 @@ describe('find one todo', () => {
 
   describe('TodosService.findOne', () => {
     const projectRepo = {} as ProjectsRepository;
+    const findById = vi.fn();
     const todosRepo = {
-      findById: vi.fn(),
+      findById,
     } as unknown as TodosRepository;
     const service = new TodosService(todosRepo, projectRepo);
 
@@ -213,16 +218,16 @@ describe('find one todo', () => {
         createdAt: 'now',
         updatedAt: 'now',
       };
-      todosRepo.findById = vi.fn().mockResolvedValue(todoEntity);
+      findById.mockResolvedValue(todoEntity);
 
       const result = await service.findOne('user-1', '1');
 
-      expect(todosRepo.findById).toHaveBeenCalledWith('1', 'user-1');
+      expect(findById).toHaveBeenCalledWith('1', 'user-1');
       expect(result).toEqual(todoEntity);
     });
 
     it('throws NotFound when missing', async () => {
-      todosRepo.findById = vi.fn().mockResolvedValue(null);
+      findById.mockResolvedValue(null);
       await expect(service.findOne('user-1', '999')).rejects.toThrow(NotFoundException);
     });
   });
@@ -263,8 +268,8 @@ describe('find one todo', () => {
       sqlite
         .prepare('INSERT INTO t_todo (project_id, user_id, title, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(1, 'user-1', 'Deleted Task', TodoStatus.InProgress, 1, now, now);
-      const db = drizzle(sqlite);
-      repo = new TodosRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new TodosRepository(db);
     });
 
     it('returns todo for matching user and id', async () => {
@@ -294,32 +299,35 @@ describe('find one todo', () => {
 describe('find all todo', () => {
   describe('TodosController.findAll', () => {
     it('returns 0 items for authenticated user', async () => {
+      const findAll = vi.fn().mockResolvedValue({ items: [] });
       const mockService = {
-        findAll: vi.fn().mockResolvedValue({ items: [] }),
+        findAll,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.findAll({ user: { sub: 'user-1' } }, undefined);
-      expect(mockService.findAll).toHaveBeenCalledWith('user-1', undefined);
+      expect(findAll).toHaveBeenCalledWith('user-1', undefined);
       expect(result).toEqual({ items: [] });
     });
 
     it('returns 1 item for authenticated user', async () => {
+      const findAll = vi.fn().mockResolvedValue({ items: [{ id: '1' }] });
       const mockService = {
-        findAll: vi.fn().mockResolvedValue({ items: [{ id: '1' }] }),
+        findAll,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.findAll({ user: { sub: 'user-1' } }, '2024-01-01');
-      expect(mockService.findAll).toHaveBeenCalledWith('user-1', '2024-01-01');
+      expect(findAll).toHaveBeenCalledWith('user-1', '2024-01-01');
       expect(result).toEqual({ items: [{ id: '1' }] });
     });
 
     it('returns 2 items for authenticated user', async () => {
+      const findAll = vi.fn().mockResolvedValue({ items: [{ id: '1' }, { id: '2' }] });
       const mockService = {
-        findAll: vi.fn().mockResolvedValue({ items: [{ id: '1' }, { id: '2' }] }),
+        findAll,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.findAll({ user: { sub: 'user-1' } }, undefined);
-      expect(mockService.findAll).toHaveBeenCalledWith('user-1', undefined);
+      expect(findAll).toHaveBeenCalledWith('user-1', undefined);
       expect(result).toEqual({ items: [{ id: '1' }, { id: '2' }] });
     });
 
@@ -331,17 +339,18 @@ describe('find all todo', () => {
 
   describe('TodosService.findAll', () => {
     const projectRepo = {} as ProjectsRepository;
+    const queryByUser = vi.fn();
     const todosRepo = {
-      queryByUser: vi.fn(),
+      queryByUser,
     } as unknown as TodosRepository;
     const service = new TodosService(todosRepo, projectRepo);
 
     it('returns 0 items', async () => {
-      todosRepo.queryByUser = vi.fn().mockResolvedValue([]);
+      queryByUser.mockResolvedValue([]);
 
       const result = await service.findAll('user-1', undefined);
 
-      expect(todosRepo.queryByUser).toHaveBeenCalledWith('user-1', undefined);
+      expect(queryByUser).toHaveBeenCalledWith('user-1', undefined);
       expect(result).toEqual({ items: [] });
     });
 
@@ -358,11 +367,11 @@ describe('find all todo', () => {
           updatedAt: 'now',
         },
       ];
-      todosRepo.queryByUser = vi.fn().mockResolvedValue(entities);
+      queryByUser.mockResolvedValue(entities);
 
       const result = await service.findAll('user-1', undefined);
 
-      expect(todosRepo.queryByUser).toHaveBeenCalledWith('user-1', undefined);
+      expect(queryByUser).toHaveBeenCalledWith('user-1', undefined);
       expect(result).toEqual({ items: entities });
     });
 
@@ -389,11 +398,11 @@ describe('find all todo', () => {
           updatedAt: 'later',
         },
       ];
-      todosRepo.queryByUser = vi.fn().mockResolvedValue(entities);
+      queryByUser.mockResolvedValue(entities);
 
       const result = await service.findAll('user-1', '2024-05-01');
 
-      expect(todosRepo.queryByUser).toHaveBeenCalledWith('user-1', '2024-05-01');
+      expect(queryByUser).toHaveBeenCalledWith('user-1', '2024-05-01');
       expect(result).toEqual({ items: entities });
     });
   });
@@ -435,8 +444,8 @@ describe('find all todo', () => {
       insertTodo.run(1, 'other-user', 'Task 3', TodoStatus.NotStarted, 0, now, now);
       insertTodo.run(1, 'user-1', 'Task 4', TodoStatus.NotStarted, 0, otherDay, otherDay);
       insertTodo.run(1, 'user-1', 'Task 5', TodoStatus.NotStarted, 0, beforeOtherDay, beforeOtherDay);
-      const db = drizzle(sqlite);
-      repo = new TodosRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new TodosRepository(db);
     });
 
     it('returns 3 active todos for user', async () => {
@@ -464,32 +473,35 @@ describe('find all todo', () => {
 describe('search todo', () => {
   describe('TodosController.search', () => {
     it('returns empty list for authenticated user', async () => {
+      const search = vi.fn().mockResolvedValue({ items: [] });
       const mockService = {
-        search: vi.fn().mockResolvedValue({ items: [] }),
+        search,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.search({ user: { sub: 'user-1' } }, {} as SearchTodoQueryDto);
-      expect(mockService.search).toHaveBeenCalledWith('user-1', {});
+      expect(search).toHaveBeenCalledWith('user-1', {});
       expect(result).toEqual({ items: [] });
     });
 
     it('returns single item list for authenticated user', async () => {
+      const search = vi.fn().mockResolvedValue({ items: [{ id: '1' }] });
       const mockService = {
-        search: vi.fn().mockResolvedValue({ items: [{ id: '1' }] }),
+        search,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.search({ user: { sub: 'user-1' } }, {} as SearchTodoQueryDto);
-      expect(mockService.search).toHaveBeenCalledWith('user-1', {});
+      expect(search).toHaveBeenCalledWith('user-1', {});
       expect(result).toEqual({ items: [{ id: '1' }] });
     });
 
     it('returns two items for authenticated user', async () => {
+      const search = vi.fn().mockResolvedValue({ items: [{ id: '1' }, { id: '2' }] });
       const mockService = {
-        search: vi.fn().mockResolvedValue({ items: [{ id: '1' }, { id: '2' }] }),
+        search,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.search({ user: { sub: 'user-1' } }, {} as SearchTodoQueryDto);
-      expect(mockService.search).toHaveBeenCalledWith('user-1', {});
+      expect(search).toHaveBeenCalledWith('user-1', {});
       expect(result).toEqual({ items: [{ id: '1' }, { id: '2' }] });
     });
 
@@ -513,16 +525,17 @@ describe('search todo', () => {
   });
 
   describe('TodosService.search', () => {
+    const search = vi.fn();
     const repo = {
-      search: vi.fn(),
+      search,
     } as unknown as TodosRepository;
     const projectRepo = {} as ProjectsRepository;
     const service = new TodosService(repo, projectRepo);
 
     it('returns empty list when no result', async () => {
-      repo.search = vi.fn().mockResolvedValue([]);
+      search.mockResolvedValue([]);
       const result = await service.search('user-1', { createdTo: '2024-05-03' });
-      expect(repo.search).toHaveBeenCalledWith(
+      expect(search).toHaveBeenCalledWith(
         'user-1',
         expect.objectContaining({ createdTo: '2024-05-03T00:00:00.000Z' }),
         51,
@@ -543,9 +556,9 @@ describe('search todo', () => {
           updatedAt: 'now',
         },
       ];
-      repo.search = vi.fn().mockResolvedValue(entities);
+      search.mockResolvedValue(entities);
       const result = await service.search('user-1', { createdFrom: '2024-05-01', updatedTo: '2024-05-02' });
-      expect(repo.search).toHaveBeenCalledWith(
+      expect(search).toHaveBeenCalledWith(
         'user-1',
         expect.objectContaining({
           createdFrom: '2024-05-01T00:00:00.000Z',
@@ -567,7 +580,7 @@ describe('search todo', () => {
         createdAt: 'now',
         updatedAt: 'now',
       })) as TodoEntity[];
-      repo.search = vi.fn().mockResolvedValue(many);
+      search.mockResolvedValue(many);
       await expect(service.search('user-1', {})).rejects.toThrow(BadRequestException);
     });
   });
@@ -608,8 +621,8 @@ describe('search todo', () => {
       insert.run(1, 'user-1', 'Beta work', TodoStatus.InProgress, 0, later, later);
       insert.run(1, 'user-1', 'Gamma done', TodoStatus.Done, 1, now, now); // deleted
       insert.run(1, 'other-user', 'Other task', TodoStatus.NotStarted, 0, now, now);
-      const db = drizzle(sqlite);
-      repo = new TodosRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new TodosRepository(db);
     });
 
     it('filters by title, status, and date ranges', async () => {
@@ -698,12 +711,13 @@ describe('search todo', () => {
 describe('update todo', () => {
   describe('TodosController.update', () => {
     it('updates todo for authenticated user', async () => {
+      const update = vi.fn().mockResolvedValue({ id: '1', title: 'Updated' });
       const mockService = {
-        update: vi.fn().mockResolvedValue({ id: '1', title: 'Updated' }),
+        update,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.update({ user: { sub: 'user-1' } }, '1', { title: 'Updated' });
-      expect(mockService.update).toHaveBeenCalledWith('user-1', '1', { title: 'Updated' });
+      expect(update).toHaveBeenCalledWith('user-1', '1', { title: 'Updated' });
       expect(result).toEqual({ id: '1', title: 'Updated' });
     });
 
@@ -715,8 +729,9 @@ describe('update todo', () => {
 
   describe('TodosService.update', () => {
     const projectRepo = {} as ProjectsRepository;
+    const updateById = vi.fn();
     const todosRepo = {
-      updateById: vi.fn(),
+      updateById,
     } as unknown as TodosRepository;
     const service = new TodosService(todosRepo, projectRepo);
 
@@ -731,16 +746,16 @@ describe('update todo', () => {
         createdAt: 'old',
         updatedAt: 'new',
       };
-      todosRepo.updateById = vi.fn().mockResolvedValue(updated);
+      updateById.mockResolvedValue(updated);
 
       const result = await service.update('user-1', '1', { title: 'Updated', status: TodoStatus.Done });
 
-      expect(todosRepo.updateById).toHaveBeenCalledWith('1', 'user-1', { title: 'Updated', status: TodoStatus.Done });
+      expect(updateById).toHaveBeenCalledWith('1', 'user-1', { title: 'Updated', status: TodoStatus.Done });
       expect(result).toEqual(updated);
     });
 
     it('throws NotFound when repository returns null', async () => {
-      todosRepo.updateById = vi.fn().mockResolvedValue(null);
+      updateById.mockResolvedValue(null);
       await expect(service.update('user-1', '1', { title: 'Updated' })).rejects.toThrow(NotFoundException);
     });
   });
@@ -784,8 +799,8 @@ describe('update todo', () => {
       sqlite
         .prepare('INSERT INTO t_todo (project_id, user_id, title, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(1, 'user-1', 'Deleted Task', TodoStatus.InProgress, 1, now, oldUpdatedAt);
-      const db = drizzle(sqlite);
-      repo = new TodosRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new TodosRepository(db);
     });
 
     it('updates title and status for owned active todo', async () => {
@@ -826,12 +841,13 @@ describe('update todo', () => {
 describe('delete todo', () => {
   describe('TodosController.remove', () => {
     it('deletes todo for authenticated user', async () => {
+      const remove = vi.fn().mockResolvedValue(undefined);
       const mockService = {
-        remove: vi.fn().mockResolvedValue(undefined),
+        remove,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
       const result = await controller.remove({ user: { sub: 'user-1' } }, '1');
-      expect(mockService.remove).toHaveBeenCalledWith('user-1', '1');
+      expect(remove).toHaveBeenCalledWith('user-1', '1');
       expect(result).toBeUndefined();
     });
 
@@ -843,19 +859,20 @@ describe('delete todo', () => {
 
   describe('TodosService.remove', () => {
     const projectRepo = {} as ProjectsRepository;
+    const softDelete = vi.fn();
     const todosRepo = {
-      softDelete: vi.fn(),
+      softDelete,
     } as unknown as TodosRepository;
     const service = new TodosService(todosRepo, projectRepo);
 
     it('returns void when repository deletes', async () => {
-      todosRepo.softDelete = vi.fn().mockResolvedValue(true);
+      softDelete.mockResolvedValue(true);
       await service.remove('user-1', '1');
-      expect(todosRepo.softDelete).toHaveBeenCalledWith('1', 'user-1');
+      expect(softDelete).toHaveBeenCalledWith('1', 'user-1');
     });
 
     it('throws NotFound when repository returns false', async () => {
-      todosRepo.softDelete = vi.fn().mockResolvedValue(false);
+      softDelete.mockResolvedValue(false);
       await expect(service.remove('user-1', '1')).rejects.toThrow(NotFoundException);
     });
   });
@@ -899,8 +916,8 @@ describe('delete todo', () => {
       sqlite
         .prepare('INSERT INTO t_todo (project_id, user_id, title, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
         .run(1, 'user-1', 'Deleted Task', TodoStatus.InProgress, 1, now, oldUpdatedAt);
-      const db = drizzle(sqlite);
-      repo = new TodosRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new TodosRepository(db);
     });
 
     it('soft deletes owned active todo', async () => {

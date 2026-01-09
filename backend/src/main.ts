@@ -45,4 +45,9 @@ async function bootstrap() {
   await app.listen(port);
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  // NestFactory.create などで例外が出た場合にプロセスを落とす
+  // eslint-disable-next-line no-console
+  console.error('Failed to bootstrap application', err);
+  process.exit(1);
+});

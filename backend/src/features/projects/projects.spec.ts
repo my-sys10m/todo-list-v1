@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, ValidationPipe } from '@nestjs/common';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { CreateProjectDto } from './projects.dto';
 import { ProjectsController } from './projects.controller';
 import { ProjectEntity, ProjectsRepository } from './projects.repository';
@@ -11,12 +12,13 @@ import { ProjectsService } from './projects.service';
 describe('create project', () => {
   describe('controller', () => {
     it('returns created project for authenticated user', async () => {
+      const create = vi.fn().mockResolvedValue({ id: '1' });
       const mockService = {
-        create: vi.fn().mockResolvedValue({ id: '1' }),
+        create,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
       const result = await controller.create({ user: { sub: 'user-1' } }, { name: 'New Project' } as CreateProjectDto);
-      expect(mockService.create).toHaveBeenCalledWith('user-1', { name: 'New Project' });
+      expect(create).toHaveBeenCalledWith('user-1', { name: 'New Project' });
       expect(result).toEqual({ id: '1' });
     });
 
@@ -40,14 +42,16 @@ describe('create project', () => {
   });
 
   describe('service', () => {
+    const findByName = vi.fn();
+    const insertProject = vi.fn();
     const repo = {
-      findByName: vi.fn(),
-      insertProject: vi.fn(),
+      findByName,
+      insertProject,
     } as unknown as ProjectsRepository;
     const service = new ProjectsService(repo);
 
     it('creates project when not duplicated', async () => {
-      repo.findByName = vi.fn().mockResolvedValue(null);
+      findByName.mockResolvedValue(null);
       const entity: ProjectEntity = {
         id: '1',
         userId: 'user-1',
@@ -55,17 +59,17 @@ describe('create project', () => {
         createdAt: 'now',
         updatedAt: 'now',
       };
-      repo.insertProject = vi.fn().mockResolvedValue(entity);
+      insertProject.mockResolvedValue(entity);
 
       const result = await service.create('user-1', { name: 'New Project' });
 
-      expect(repo.findByName).toHaveBeenCalledWith('user-1', 'New Project');
-      expect(repo.insertProject).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-1', name: 'New Project' }));
+      expect(findByName).toHaveBeenCalledWith('user-1', 'New Project');
+      expect(insertProject).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-1', name: 'New Project' }));
       expect(result).toEqual(entity);
     });
 
     it('throws Conflict when project name already exists for user', async () => {
-      repo.findByName = vi.fn().mockResolvedValue({
+      findByName.mockResolvedValue({
         id: '1',
         userId: 'user-1',
         name: 'New Project',
@@ -91,8 +95,8 @@ describe('create project', () => {
           updated_at text NOT NULL
         );
       `);
-      const db = drizzle(sqlite);
-      repo = new ProjectsRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new ProjectsRepository(db);
     });
 
     it('inserts project and returns mapped entity', async () => {
@@ -119,12 +123,13 @@ describe('create project', () => {
 describe('update project', () => {
   describe('controller', () => {
     it('updates project for authenticated user', async () => {
+      const update = vi.fn().mockResolvedValue({ id: '1', name: 'updated' });
       const mockService = {
-        update: vi.fn().mockResolvedValue({ id: '1', name: 'updated' }),
+        update,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
       const result = await controller.update({ user: { sub: 'user-1' } }, '1', { name: 'updated' });
-      expect(mockService.update).toHaveBeenCalledWith('user-1', '1', { name: 'updated' });
+      expect(update).toHaveBeenCalledWith('user-1', '1', { name: 'updated' });
       expect(result).toEqual({ id: '1', name: 'updated' });
     });
 
@@ -135,8 +140,9 @@ describe('update project', () => {
   });
 
   describe('service', () => {
+    const updateProject = vi.fn();
     const repo = {
-      updateProject: vi.fn(),
+      updateProject,
     } as unknown as ProjectsRepository;
     const service = new ProjectsService(repo);
 
@@ -148,14 +154,14 @@ describe('update project', () => {
         createdAt: 'now',
         updatedAt: 'later',
       };
-      repo.updateProject = vi.fn().mockResolvedValue(entity);
+      updateProject.mockResolvedValue(entity);
       const result = await service.update('user-1', '1', { name: 'updated' });
-      expect(repo.updateProject).toHaveBeenCalledWith('1', 'user-1', { name: 'updated' });
+      expect(updateProject).toHaveBeenCalledWith('1', 'user-1', { name: 'updated' });
       expect(result).toEqual(entity);
     });
 
     it('throws NotFound when repository returns null', async () => {
-      repo.updateProject = vi.fn().mockResolvedValue(null);
+      updateProject.mockResolvedValue(null);
       await expect(service.update('user-1', '1', { name: 'updated' })).rejects.toThrow(NotFoundException);
     });
   });
@@ -180,8 +186,8 @@ describe('update project', () => {
       oldUpdatedAt = new Date(Date.now() - 1000).toISOString();
       sqlite.prepare('INSERT INTO t_project (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run('user-1', 'project', now, oldUpdatedAt);
       sqlite.prepare('INSERT INTO t_project (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run('other-user', 'project2', now, oldUpdatedAt);
-      const db = drizzle(sqlite);
-      repo = new ProjectsRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new ProjectsRepository(db);
     });
 
     it('updates name when owned', async () => {
@@ -202,12 +208,13 @@ describe('update project', () => {
 describe('remove project', () => {
   describe('controller', () => {
     it('removes project for authenticated user', async () => {
+      const remove = vi.fn().mockResolvedValue(undefined);
       const mockService = {
-        remove: vi.fn().mockResolvedValue(undefined),
+        remove,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
       const result = await controller.remove({ user: { sub: 'user-1' } }, '1');
-      expect(mockService.remove).toHaveBeenCalledWith('user-1', '1');
+      expect(remove).toHaveBeenCalledWith('user-1', '1');
       expect(result).toBeUndefined();
     });
 
@@ -218,19 +225,20 @@ describe('remove project', () => {
   });
 
   describe('service', () => {
+    const softDelete = vi.fn();
     const repo = {
-      softDelete: vi.fn(),
+      softDelete,
     } as unknown as ProjectsRepository;
     const service = new ProjectsService(repo);
 
     it('completes when repository deletes', async () => {
-      repo.softDelete = vi.fn().mockResolvedValue(true);
+      softDelete.mockResolvedValue(true);
       await service.remove('user-1', '1');
-      expect(repo.softDelete).toHaveBeenCalledWith('1', 'user-1');
+      expect(softDelete).toHaveBeenCalledWith('1', 'user-1');
     });
 
     it('throws NotFound when repository returns false', async () => {
-      repo.softDelete = vi.fn().mockResolvedValue(false);
+      softDelete.mockResolvedValue(false);
       await expect(service.remove('user-1', '1')).rejects.toThrow(NotFoundException);
     });
   });
@@ -253,8 +261,8 @@ describe('remove project', () => {
       now = new Date().toISOString();
       sqlite.prepare('INSERT INTO t_project (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run('user-1', 'project', now, now);
       sqlite.prepare('INSERT INTO t_project (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run('other-user', 'project2', now, now);
-      const db = drizzle(sqlite);
-      repo = new ProjectsRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new ProjectsRepository(db);
     });
 
     it('deletes owned project', async () => {
@@ -274,32 +282,35 @@ describe('remove project', () => {
 describe('list projects by user', () => {
   describe('controller', () => {
     it('returns empty list for authenticated user', async () => {
+      const listByUser = vi.fn().mockResolvedValue({ items: [] });
       const mockService = {
-        listByUser: vi.fn().mockResolvedValue({ items: [] }),
+        listByUser,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
       const result = await controller.listByUser({ user: { sub: 'user-1' } });
-      expect(mockService.listByUser).toHaveBeenCalledWith('user-1');
+      expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: [] });
     });
 
     it('returns single item list for authenticated user', async () => {
+      const listByUser = vi.fn().mockResolvedValue({ items: [{ id: '1' }] });
       const mockService = {
-        listByUser: vi.fn().mockResolvedValue({ items: [{ id: '1' }] }),
+        listByUser,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
       const result = await controller.listByUser({ user: { sub: 'user-1' } });
-      expect(mockService.listByUser).toHaveBeenCalledWith('user-1');
+      expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: [{ id: '1' }] });
     });
 
     it('returns two items for authenticated user', async () => {
+      const listByUser = vi.fn().mockResolvedValue({ items: [{ id: '1' }, { id: '2' }] });
       const mockService = {
-        listByUser: vi.fn().mockResolvedValue({ items: [{ id: '1' }, { id: '2' }] }),
+        listByUser,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
       const result = await controller.listByUser({ user: { sub: 'user-1' } });
-      expect(mockService.listByUser).toHaveBeenCalledWith('user-1');
+      expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: [{ id: '1' }, { id: '2' }] });
     });
 
@@ -310,15 +321,16 @@ describe('list projects by user', () => {
   });
 
   describe('service', () => {
+    const listByUser = vi.fn();
     const repo = {
-      listByUser: vi.fn(),
+      listByUser,
     } as unknown as ProjectsRepository;
     const service = new ProjectsService(repo);
 
     it('returns empty list', async () => {
-      repo.listByUser = vi.fn().mockResolvedValue([]);
+      listByUser.mockResolvedValue([]);
       const result = await service.listByUser('user-1', 'user-1');
-      expect(repo.listByUser).toHaveBeenCalledWith('user-1');
+      expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: [] });
     });
 
@@ -326,9 +338,9 @@ describe('list projects by user', () => {
       const entities: ProjectEntity[] = [
         { id: '1', userId: 'user-1', name: 'proj1', createdAt: 'now', updatedAt: 'now' },
       ];
-      repo.listByUser = vi.fn().mockResolvedValue(entities);
+      listByUser.mockResolvedValue(entities);
       const result = await service.listByUser('user-1', 'user-1');
-      expect(repo.listByUser).toHaveBeenCalledWith('user-1');
+      expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: entities });
     });
 
@@ -337,9 +349,9 @@ describe('list projects by user', () => {
         { id: '1', userId: 'user-1', name: 'proj1', createdAt: 'now', updatedAt: 'now' },
         { id: '2', userId: 'user-1', name: 'proj2', createdAt: 'now', updatedAt: 'now' },
       ];
-      repo.listByUser = vi.fn().mockResolvedValue(entities);
+      listByUser.mockResolvedValue(entities);
       const result = await service.listByUser('user-1', 'user-1');
-      expect(repo.listByUser).toHaveBeenCalledWith('user-1');
+      expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: entities });
     });
 
@@ -367,8 +379,8 @@ describe('list projects by user', () => {
       insert.run('user-1', 'project-a', now, now);
       insert.run('user-1', 'project-b', now, now);
       insert.run('other-user', 'project-c', now, now);
-      const db = drizzle(sqlite);
-      repo = new ProjectsRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      repo = new ProjectsRepository(db);
     });
 
     it('returns only projects for the given user', async () => {
@@ -389,8 +401,8 @@ describe('list projects by user', () => {
         );
       `);
       sqlite.prepare('INSERT INTO t_project (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run('user-1', 'only', now, now);
-      const db = drizzle(sqlite);
-      const singleRepo = new ProjectsRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      const singleRepo = new ProjectsRepository(db);
       const result = await singleRepo.listByUser('user-1');
       expect(result.map((p) => p.name)).toEqual(['only']);
     });
@@ -406,8 +418,8 @@ describe('list projects by user', () => {
           updated_at text NOT NULL
         );
       `);
-      const db = drizzle(sqlite);
-      const emptyRepo = new ProjectsRepository(db as any);
+      const db = drizzle(sqlite) as BetterSQLite3Database;
+      const emptyRepo = new ProjectsRepository(db);
       const result = await emptyRepo.listByUser('user-1');
       expect(result).toEqual([]);
     });

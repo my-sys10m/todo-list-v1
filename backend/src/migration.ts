@@ -10,7 +10,7 @@ type MigrationResult = {
 };
 
 /** drizzle の SQL マイグレーションを SQLite に適用する Lambda ハンドラー。 */
-export const handler: Handler = async (): Promise<MigrationResult> => {
+export const handler: Handler = (): Promise<MigrationResult> => {
   const sqlitePath = process.env.SQLITE_PATH ?? '/mnt/efs/todo.db';
   const defaultSourceDir = fs.existsSync(path.resolve(__dirname, '../db/migration'))
     ? path.resolve(__dirname, '../db/migration')
@@ -45,7 +45,7 @@ export const handler: Handler = async (): Promise<MigrationResult> => {
     applied.push(file);
   }
 
-  return { applied, skipped };
+  return Promise.resolve({ applied, skipped });
 };
 
 const readHistory = (historyPath: string): Set<string> => {
