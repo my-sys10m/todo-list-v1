@@ -28,6 +28,18 @@ export class CreateTodoDto {
   @IsEnum(TodoStatus)
   @IsOptional()
   status?: TodoStatus;
+
+  /** 作成日時 (ISO)。省略時はサーバー時刻。 */
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  createdAt?: string;
+
+  /** 更新日時 (ISO)。省略時は createdAt と同一。 */
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  updatedAt?: string;
 }
 
 /** TODO 更新リクエスト DTO。 */

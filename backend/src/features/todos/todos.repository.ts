@@ -34,16 +34,25 @@ export class TodosRepository {
   ) {}
 
   /** TODO を新規作成し永続化済みエンティティを返す。 */
-  async insertTodo(data: { projectId: string; userId: string; title: string; status?: TodoStatus }): Promise<TodoEntity> {
+  async insertTodo(data: {
+    projectId: string;
+    userId: string;
+    title: string;
+    status?: TodoStatus;
+    createdAt?: string;
+    updatedAt?: string;
+  }): Promise<TodoEntity> {
     const now = new Date().toISOString();
+    const createdAt = data.createdAt ?? now;
+    const updatedAt = data.updatedAt ?? createdAt;
     const values: TodoInsert = {
       projectId: Number(data.projectId),
       userId: data.userId,
       title: data.title,
       status: data.status ?? TodoStatus.NotStarted,
       isDeleted: false,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
     };
     const row = await this.db.insert(todosTable).values(values).returning().get();
     if (!row) {

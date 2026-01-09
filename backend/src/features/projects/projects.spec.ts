@@ -60,7 +60,7 @@ describe('create project', () => {
       const result = await service.create('user-1', { name: 'New Project' });
 
       expect(repo.findByName).toHaveBeenCalledWith('user-1', 'New Project');
-      expect(repo.insertProject).toHaveBeenCalledWith({ userId: 'user-1', name: 'New Project' });
+      expect(repo.insertProject).toHaveBeenCalledWith(expect.objectContaining({ userId: 'user-1', name: 'New Project' }));
       expect(result).toEqual(entity);
     });
 
@@ -104,6 +104,14 @@ describe('create project', () => {
       });
       expect(result.createdAt).toBeTruthy();
       expect(result.updatedAt).toBeTruthy();
+    });
+
+    it('uses provided timestamps when given', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00.000Z').toISOString();
+      const updatedAt = new Date('2024-01-02T00:00:00.000Z').toISOString();
+      const result = await repo.insertProject({ userId: 'user-1', name: 'Project B', createdAt, updatedAt });
+      expect(result.createdAt).toBe(createdAt);
+      expect(result.updatedAt).toBe(updatedAt);
     });
   });
 });

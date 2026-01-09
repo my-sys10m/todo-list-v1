@@ -81,12 +81,14 @@ describe('create todo', () => {
       const result = await service.create('user-1', { projectId: '1', title: 'Task', status: TodoStatus.InProgress });
 
       expect(projectRepo.findById).toHaveBeenCalledWith('1', 'user-1');
-      expect(todosRepo.insertTodo).toHaveBeenCalledWith({
-        projectId: '1',
-        title: 'Task',
-        status: TodoStatus.InProgress,
-        userId: 'user-1',
-      });
+      expect(todosRepo.insertTodo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          projectId: '1',
+          title: 'Task',
+          status: TodoStatus.InProgress,
+          userId: 'user-1',
+        }),
+      );
       expect(result).toEqual({
         id: '1',
         projectId: '1',
@@ -157,6 +159,20 @@ describe('create todo', () => {
     it('defaults status to NotStarted when omitted', async () => {
       const result = await repo.insertTodo({ projectId: '1', userId: 'user-1', title: 'Another Task' });
       expect(result.status).toBe(TodoStatus.NotStarted);
+    });
+
+    it('uses provided timestamps when given', async () => {
+      const createdAt = new Date('2024-02-01T00:00:00.000Z').toISOString();
+      const updatedAt = new Date('2024-02-02T00:00:00.000Z').toISOString();
+      const result = await repo.insertTodo({
+        projectId: '1',
+        userId: 'user-1',
+        title: 'Stamped Task',
+        createdAt,
+        updatedAt,
+      });
+      expect(result.createdAt).toBe(createdAt);
+      expect(result.updatedAt).toBe(updatedAt);
     });
   });
 });

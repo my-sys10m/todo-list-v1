@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -7,6 +8,8 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.use(helmet());
+
+  // CORSの設定
   const allowedOrigins =
     process.env.FRONTEND_ORIGIN?.split(',').map((o) => o.trim()).filter((o) => o.length > 0) ?? [
       'http://localhost:5173',
@@ -19,6 +22,15 @@ async function bootstrap() {
     credentials: true,
   });
 
+  // ValidationPipeの設定
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+    }),
+  );
+
+  // Swaggerの設定
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Todo API')
     .setDescription('Todo/Project API documentation')

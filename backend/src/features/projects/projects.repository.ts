@@ -25,13 +25,15 @@ export class ProjectsRepository {
   constructor(@Inject(DRIZZLE_DB) private readonly db: BetterSQLite3Database) {}
 
   /** 指定ユーザーに紐づくプロジェクトを新規作成する。 */
-  async insertProject(data: { userId: string; name: string }): Promise<ProjectEntity> {
+  async insertProject(data: { userId: string; name: string; createdAt?: string; updatedAt?: string }): Promise<ProjectEntity> {
     const now = new Date().toISOString();
+    const createdAt = data.createdAt ?? now;
+    const updatedAt = data.updatedAt ?? createdAt;
     const values: ProjectInsert = {
       userId: data.userId,
       name: data.name,
-      createdAt: now,
-      updatedAt: now,
+      createdAt,
+      updatedAt,
     };
     const row = await this.db.insert(projectsTable).values(values).returning().get();
     if (!row) {
