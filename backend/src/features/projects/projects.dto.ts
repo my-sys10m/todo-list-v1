@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsDateString, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /** プロジェクト新規作成リクエスト DTO。 */
 export class CreateProjectDto {
@@ -9,6 +9,18 @@ export class CreateProjectDto {
   @MaxLength(255)
   @IsNotEmpty()
   name!: string;
+
+  /** 作成日時 (ISO)。省略時はサーバー時刻。 */
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  createdAt?: string;
+
+  /** 更新日時 (ISO)。省略時は createdAt と同一。 */
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  updatedAt?: string;
 }
 
 /** プロジェクト更新リクエスト DTO。 */

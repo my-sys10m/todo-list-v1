@@ -11,7 +11,12 @@ export class ProjectsService {
   async create(userId: string, dto: CreateProjectDto): Promise<ProjectResponseDto> {
     const existing = await this.projectsRepository.findByName(userId, dto.name);
     if (existing) throw new ConflictException('project already exists');
-    const entity = await this.projectsRepository.insertProject({ userId, name: dto.name });
+    const entity = await this.projectsRepository.insertProject({
+      userId,
+      name: dto.name,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+    });
     return this.map(entity);
   }
 

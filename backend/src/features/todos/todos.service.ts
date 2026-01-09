@@ -12,7 +12,14 @@ export class TodosService {
   async create(userId: string, dto: CreateTodoDto): Promise<TodoResponseDto> {
     const project = await this.projectsRepository.findById(dto.projectId, userId);
     if (!project) throw new NotFoundException('project not found');
-    const entity = await this.repository.insertTodo({ ...dto, userId });
+    const entity = await this.repository.insertTodo({
+      projectId: dto.projectId,
+      title: dto.title,
+      status: dto.status,
+      userId,
+      createdAt: dto.createdAt,
+      updatedAt: dto.updatedAt,
+    });
     return this.map(entity);
   }
 
