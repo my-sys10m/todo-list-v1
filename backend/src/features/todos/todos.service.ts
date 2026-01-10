@@ -36,7 +36,7 @@ export class TodosService {
     return { items: items.map(this.map) };
   }
 
-  /** フィルタ条件で TODO を検索する。最大 50 件まで返却し、それを超える場合はエラーとする。 */
+  /** フィルタ条件で TODO を検索する。最大 200 件まで返却し、それを超える場合はエラーとする。 */
   async search(userId: string, query: SearchTodoQueryDto): Promise<TodoListResponseDto> {
     const createdFrom = appendMicroSec(query.createdFrom);
     const createdTo = appendMicroSec(query.createdTo);
@@ -53,9 +53,9 @@ export class TodosService {
         updatedFrom,
         updatedTo,
       },
-      51,
+      201,
     );
-    if (items.length > 50) {
+    if (items.length > 200) {
       throw new BadRequestException('Too many results. Please narrow your search conditions.');
     }
     return { items: items.map(this.map) };
