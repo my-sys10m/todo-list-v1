@@ -96,10 +96,11 @@ export class TodosRepository {
     limit: number,
   ): Promise<TodoEntity[]> {
     const baseWhere = [eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)];
-    const nonDateConditions = [];
     if (filters.projectId) {
-      nonDateConditions.push(eq(todosTable.projectId, Number(filters.projectId)));
+      baseWhere.push(eq(todosTable.projectId, Number(filters.projectId))); // projectId は OR に巻き込まず常に AND
     }
+
+    const nonDateConditions = [];
     if (filters.title) {
       nonDateConditions.push(like(todosTable.title, `%${filters.title}%`));
     }
@@ -122,7 +123,11 @@ export class TodosRepository {
     const nonDateExpr = nonDateConditions.length ? and(...nonDateConditions) : undefined;
     const dateExpr = dateConditions.length ? and(...dateConditions) : undefined;
 
-    const additionalWhere = nonDateExpr && dateExpr ? [or(nonDateExpr, dateExpr)] : nonDateExpr ? [nonDateExpr] : dateExpr ? [dateExpr] : [];
+    // 非日付条件(title/status)と日付条件を OR で束ね、projectId は baseWhere で AND 固定
+    const additionalWhere =
+      nonDateExpr && dateExpr
+        ? [or(nonDateExpr, dateExpr)]
+        : [nonDateExpr, dateExpr].filter((expr): expr is NonNullable<typeof nonDateExpr> => Boolean(expr));
     const whereExpr = and(...baseWhere, ...additionalWhere);
 
     const rows = this.db.select().from(todosTable).where(whereExpr).limit(limit).all();

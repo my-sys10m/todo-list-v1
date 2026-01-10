@@ -703,7 +703,7 @@ describe('search todo', () => {
       expect(result[0].title).toBe('Delta other project');
     });
 
-    it('matches when date conditions hit even if status does not (OR grouping)', async () => {
+    it('matches via date when status mismatches (OR grouping)', async () => {
       const result = await repo.search(
         'user-1',
         {
@@ -715,6 +715,22 @@ describe('search todo', () => {
         10,
       );
       expect(result.map((t) => t.title)).toEqual(['Beta work']);
+    });
+
+    it('keeps project filter while OR-ing non-project conditions with date', async () => {
+      const result = await repo.search(
+        'user-1',
+        {
+          projectId: '2',
+          status: TodoStatus.Done,
+          createdFrom: '2024-05-03T00:00:00.000Z',
+          createdTo: '2024-05-04T00:00:00.000Z',
+        },
+        10,
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].projectId).toBe('2');
+      expect(result[0].title).toBe('Delta other project');
     });
 
     it('includes items on createdAt boundary', async () => {
