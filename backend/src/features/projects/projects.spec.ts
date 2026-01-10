@@ -4,10 +4,14 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { Request } from 'express';
 import { CreateProjectDto } from './projects.dto';
 import { ProjectsController } from './projects.controller';
 import { ProjectEntity, ProjectsRepository } from './projects.repository';
 import { ProjectsService } from './projects.service';
+
+const authedReq = (sub: string) => ({ user: { sub } } as unknown as Request & { user?: { sub: string } });
+const emptyReq = {} as unknown as Request;
 
 describe('create project', () => {
   describe('controller', () => {
@@ -17,14 +21,14 @@ describe('create project', () => {
         create,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
-      const result = await controller.create({ user: { sub: 'user-1' } }, { name: 'New Project' } as CreateProjectDto);
+      const result = await controller.create(authedReq('user-1'), { name: 'New Project' } as CreateProjectDto);
       expect(create).toHaveBeenCalledWith('user-1', { name: 'New Project' });
       expect(result).toEqual({ id: '1' });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new ProjectsController({} as ProjectsService);
-      expect(() => controller.create({}, { name: 'New Project' } as CreateProjectDto)).toThrow(ForbiddenException);
+      expect(() => controller.create(emptyReq, { name: 'New Project' } as CreateProjectDto)).toThrow(ForbiddenException);
     });
 
     it('validates request body', async () => {
@@ -128,14 +132,14 @@ describe('update project', () => {
         update,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
-      const result = await controller.update({ user: { sub: 'user-1' } }, '1', { name: 'updated' });
+      const result = await controller.update(authedReq('user-1'), '1', { name: 'updated' });
       expect(update).toHaveBeenCalledWith('user-1', '1', { name: 'updated' });
       expect(result).toEqual({ id: '1', name: 'updated' });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new ProjectsController({} as ProjectsService);
-      expect(() => controller.update({}, '1', { name: 'updated' })).toThrow(ForbiddenException);
+      expect(() => controller.update(emptyReq, '1', { name: 'updated' })).toThrow(ForbiddenException);
     });
   });
 
@@ -213,14 +217,14 @@ describe('remove project', () => {
         remove,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
-      const result = await controller.remove({ user: { sub: 'user-1' } }, '1');
+      const result = await controller.remove(authedReq('user-1'), '1');
       expect(remove).toHaveBeenCalledWith('user-1', '1');
       expect(result).toBeUndefined();
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new ProjectsController({} as ProjectsService);
-      expect(() => controller.remove({}, '1')).toThrow(ForbiddenException);
+      expect(() => controller.remove(emptyReq, '1')).toThrow(ForbiddenException);
     });
   });
 
@@ -287,7 +291,7 @@ describe('list projects by user', () => {
         listByUser,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
-      const result = await controller.listByUser({ user: { sub: 'user-1' } });
+      const result = await controller.listByUser(authedReq('user-1'));
       expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: [] });
     });
@@ -298,7 +302,7 @@ describe('list projects by user', () => {
         listByUser,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
-      const result = await controller.listByUser({ user: { sub: 'user-1' } });
+      const result = await controller.listByUser(authedReq('user-1'));
       expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: [{ id: '1' }] });
     });
@@ -309,14 +313,14 @@ describe('list projects by user', () => {
         listByUser,
       } as unknown as ProjectsService;
       const controller = new ProjectsController(mockService);
-      const result = await controller.listByUser({ user: { sub: 'user-1' } });
+      const result = await controller.listByUser(authedReq('user-1'));
       expect(listByUser).toHaveBeenCalledWith('user-1');
       expect(result).toEqual({ items: [{ id: '1' }, { id: '2' }] });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new ProjectsController({} as ProjectsService);
-      expect(() => controller.listByUser({})).toThrow(ForbiddenException);
+      expect(() => controller.listByUser(emptyReq)).toThrow(ForbiddenException);
     });
   });
 

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, IsDateString } from 'class-validator';
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength, IsDateString, MinLength } from 'class-validator';
 
 /** TODO の進捗ステータスを示す列挙。 */
 export enum TodoStatus {
@@ -14,6 +14,8 @@ export class CreateTodoDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
+  @MinLength(1)
+  @MaxLength(20)
   projectId!: string;
 
   /** TODO のタイトル。 */
@@ -108,6 +110,15 @@ export class TodoListResponseDto {
 
 /** TODO 検索クエリ DTO。 */
 export class SearchTodoQueryDto {
+  /** プロジェクト ID。 */
+  @ApiPropertyOptional()
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  @MinLength(1)
+  @MaxLength(20)
+  projectId?: string;
+
   /** タイトルの部分一致。 */
   @ApiPropertyOptional()
   @IsString()

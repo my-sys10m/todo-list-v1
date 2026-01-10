@@ -4,11 +4,14 @@ import { BadRequestException, ForbiddenException, NotFoundException, ValidationP
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import type { Request } from 'express';
 import { ProjectsRepository } from '../projects/projects.repository';
 import { CreateTodoDto, SearchTodoQueryDto, TodoStatus } from './todos.dto';
 import { TodosController } from './todos.controller';
 import { TodoEntity, TodosRepository } from './todos.repository';
 import { TodosService } from './todos.service';
+
+const authedReq = (sub: string) => ({ user: { sub } } as unknown as Request & { user?: { sub: string } });
 
 describe('create todo', () => {
   describe('TodosController.create', () => {
@@ -18,14 +21,14 @@ describe('create todo', () => {
         create,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.create({ user: { sub: 'user-1' } }, { projectId: '1', title: 'Task' } as CreateTodoDto);
+      const result = await controller.create(authedReq('user-1'), { projectId: '1', title: 'Task' } as CreateTodoDto);
       expect(create).toHaveBeenCalledWith('user-1', { projectId: '1', title: 'Task' });
       expect(result).toEqual({ id: '1' });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new TodosController({} as TodosService);
-      expect(() => controller.create({}, { projectId: '1', title: 'Task' } as CreateTodoDto)).toThrow(ForbiddenException);
+      expect(() => controller.create({} as unknown as Request, { projectId: '1', title: 'Task' } as CreateTodoDto)).toThrow(ForbiddenException);
     });
 
     it('validates request body', async () => {
@@ -47,6 +50,20 @@ describe('create todo', () => {
       await expect(
         pipe.transform(
           { projectId: '1', title: longTitle },
+          {
+            type: 'body',
+            metatype: CreateTodoDto,
+          },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects too long projectId', async () => {
+      const pipe = new ValidationPipe({ whitelist: true, transform: true });
+      const longProjectId = '1'.repeat(21);
+      await expect(
+        pipe.transform(
+          { projectId: longProjectId, title: 'Task' },
           {
             type: 'body',
             metatype: CreateTodoDto,
@@ -188,14 +205,14 @@ describe('find one todo', () => {
         findOne,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.findOne({ user: { sub: 'user-1' } }, '1');
+      const result = await controller.findOne(authedReq('user-1'), '1');
       expect(findOne).toHaveBeenCalledWith('user-1', '1');
       expect(result).toEqual({ id: '1' });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new TodosController({} as TodosService);
-      expect(() => controller.findOne({}, '1')).toThrow(ForbiddenException);
+      expect(() => controller.findOne({} as unknown as Request, '1')).toThrow(ForbiddenException);
     });
   });
 
@@ -304,7 +321,7 @@ describe('find all todo', () => {
         findAll,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.findAll({ user: { sub: 'user-1' } }, undefined);
+      const result = await controller.findAll(authedReq('user-1'), undefined);
       expect(findAll).toHaveBeenCalledWith('user-1', undefined);
       expect(result).toEqual({ items: [] });
     });
@@ -315,7 +332,7 @@ describe('find all todo', () => {
         findAll,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.findAll({ user: { sub: 'user-1' } }, '2024-01-01');
+      const result = await controller.findAll(authedReq('user-1'), '2024-01-01');
       expect(findAll).toHaveBeenCalledWith('user-1', '2024-01-01');
       expect(result).toEqual({ items: [{ id: '1' }] });
     });
@@ -326,14 +343,14 @@ describe('find all todo', () => {
         findAll,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.findAll({ user: { sub: 'user-1' } }, undefined);
+      const result = await controller.findAll(authedReq('user-1'), undefined);
       expect(findAll).toHaveBeenCalledWith('user-1', undefined);
       expect(result).toEqual({ items: [{ id: '1' }, { id: '2' }] });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new TodosController({} as TodosService);
-      expect(() => controller.findAll({}, '2024-01-01')).toThrow(ForbiddenException);
+      expect(() => controller.findAll({} as unknown as Request, '2024-01-01')).toThrow(ForbiddenException);
     });
   });
 
@@ -478,7 +495,7 @@ describe('search todo', () => {
         search,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.search({ user: { sub: 'user-1' } }, {} as SearchTodoQueryDto);
+      const result = await controller.search(authedReq('user-1'), {} as SearchTodoQueryDto);
       expect(search).toHaveBeenCalledWith('user-1', {});
       expect(result).toEqual({ items: [] });
     });
@@ -489,7 +506,7 @@ describe('search todo', () => {
         search,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.search({ user: { sub: 'user-1' } }, {} as SearchTodoQueryDto);
+      const result = await controller.search(authedReq('user-1'), {} as SearchTodoQueryDto);
       expect(search).toHaveBeenCalledWith('user-1', {});
       expect(result).toEqual({ items: [{ id: '1' }] });
     });
@@ -500,14 +517,14 @@ describe('search todo', () => {
         search,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.search({ user: { sub: 'user-1' } }, {} as SearchTodoQueryDto);
+      const result = await controller.search(authedReq('user-1'), {} as SearchTodoQueryDto);
       expect(search).toHaveBeenCalledWith('user-1', {});
       expect(result).toEqual({ items: [{ id: '1' }, { id: '2' }] });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new TodosController({} as TodosService);
-      expect(() => controller.search({}, {} as SearchTodoQueryDto)).toThrow(ForbiddenException);
+      expect(() => controller.search({} as unknown as Request, {} as SearchTodoQueryDto)).toThrow(ForbiddenException);
     });
 
     it('validates query', async () => {
@@ -515,6 +532,20 @@ describe('search todo', () => {
       await expect(
         pipe.transform(
           { createdFrom: 'invalid-date' },
+          {
+            type: 'query',
+            metatype: SearchTodoQueryDto,
+          },
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('rejects too long projectId in query', async () => {
+      const pipe = new ValidationPipe({ whitelist: true, transform: true });
+      const longProjectId = '1'.repeat(21);
+      await expect(
+        pipe.transform(
+          { projectId: longProjectId },
           {
             type: 'query',
             metatype: SearchTodoQueryDto,
@@ -569,6 +600,18 @@ describe('search todo', () => {
       expect(result).toEqual({ items: entities });
     });
 
+    it('passes projectId through without modification', async () => {
+      search.mockResolvedValue([]);
+      await service.search('user-1', { projectId: '2' });
+      expect(search).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({
+          projectId: '2',
+        }),
+        51,
+      );
+    });
+
     it('throws BadRequest when more than 50 results', async () => {
       const many = Array.from({ length: 51 }).map((_, i) => ({
         id: `${i}`,
@@ -611,9 +654,13 @@ describe('search todo', () => {
           updated_at text NOT NULL
         );
       `);
-      sqlite.prepare('INSERT INTO t_project (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)').run('user-1', 'p1', 'now', 'now');
+      const insertProject = sqlite.prepare('INSERT INTO t_project (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)');
+      insertProject.run('user-1', 'p1', 'now', 'now');
+      const secondProject = insertProject.run('user-1', 'p2', 'now', 'now');
+      const secondProjectId = Number(secondProject.lastInsertRowid);
       now = '2024-05-01T10:00:00.000Z';
       later = '2024-05-02T10:00:00.000Z';
+      const otherProjectDate = '2024-05-03T10:00:00.000Z';
       const insert = sqlite.prepare(
         'INSERT INTO t_todo (project_id, user_id, title, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
       );
@@ -621,6 +668,7 @@ describe('search todo', () => {
       insert.run(1, 'user-1', 'Beta work', TodoStatus.InProgress, 0, later, later);
       insert.run(1, 'user-1', 'Gamma done', TodoStatus.Done, 1, now, now); // deleted
       insert.run(1, 'other-user', 'Other task', TodoStatus.NotStarted, 0, now, now);
+      insert.run(secondProjectId, 'user-1', 'Delta other project', TodoStatus.NotStarted, 0, otherProjectDate, otherProjectDate);
       const db = drizzle(sqlite) as BetterSQLite3Database;
       repo = new TodosRepository(db);
     });
@@ -640,6 +688,19 @@ describe('search todo', () => {
       );
       expect(result).toHaveLength(1);
       expect(result[0].title).toBe('Beta work');
+    });
+
+    it('filters by projectId', async () => {
+      const result = await repo.search(
+        'user-1',
+        {
+          projectId: '2',
+        },
+        10,
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].projectId).toBe('2');
+      expect(result[0].title).toBe('Delta other project');
     });
 
     it('includes items on createdAt boundary', async () => {
@@ -716,14 +777,14 @@ describe('update todo', () => {
         update,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.update({ user: { sub: 'user-1' } }, '1', { title: 'Updated' });
+      const result = await controller.update(authedReq('user-1'), '1', { title: 'Updated' });
       expect(update).toHaveBeenCalledWith('user-1', '1', { title: 'Updated' });
       expect(result).toEqual({ id: '1', title: 'Updated' });
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new TodosController({} as TodosService);
-      expect(() => controller.update({}, '1', { title: 'Updated' })).toThrow(ForbiddenException);
+      expect(() => controller.update({} as unknown as Request, '1', { title: 'Updated' })).toThrow(ForbiddenException);
     });
   });
 
@@ -846,14 +907,14 @@ describe('delete todo', () => {
         remove,
       } as unknown as TodosService;
       const controller = new TodosController(mockService);
-      const result = await controller.remove({ user: { sub: 'user-1' } }, '1');
+      const result = await controller.remove(authedReq('user-1'), '1');
       expect(remove).toHaveBeenCalledWith('user-1', '1');
       expect(result).toBeUndefined();
     });
 
     it('throws Forbidden when user is missing', () => {
       const controller = new TodosController({} as TodosService);
-      expect(() => controller.remove({}, '1')).toThrow(ForbiddenException);
+      expect(() => controller.remove({} as unknown as Request, '1')).toThrow(ForbiddenException);
     });
   });
 

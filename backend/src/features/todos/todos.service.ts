@@ -45,6 +45,7 @@ export class TodosService {
     const items = await this.repository.search(
       userId,
       {
+        projectId: query.projectId,
         title: query.title,
         status: query.status,
         createdFrom,
