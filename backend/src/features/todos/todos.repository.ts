@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq, like, gte, lte } from 'drizzle-orm';
+import { and, eq, like, gte, lte, or } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { DRIZZLE_DB } from '../../database/database.tokens';
 import { todosTable } from '../../schemas/todo';
@@ -95,29 +95,42 @@ export class TodosRepository {
     },
     limit: number,
   ): Promise<TodoEntity[]> {
-    const where = [eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)];
+    const baseWhere = [eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)];
     if (filters.projectId) {
-      where.push(eq(todosTable.projectId, Number(filters.projectId)));
+      baseWhere.push(eq(todosTable.projectId, Number(filters.projectId))); // projectId は OR に巻き込まず常に AND
     }
+
+    const nonDateConditions = [];
     if (filters.title) {
-      where.push(like(todosTable.title, `%${filters.title}%`));
+      nonDateConditions.push(like(todosTable.title, `%${filters.title}%`));
     }
     if (filters.status !== undefined) {
-      where.push(eq(todosTable.status, filters.status));
+      nonDateConditions.push(eq(todosTable.status, filters.status));
     }
+    const dateConditions = [];
     if (filters.createdFrom) {
-      where.push(gte(todosTable.createdAt, filters.createdFrom));
+      dateConditions.push(gte(todosTable.createdAt, filters.createdFrom));
     }
     if (filters.createdTo) {
-      where.push(lte(todosTable.createdAt, filters.createdTo));
+      dateConditions.push(lte(todosTable.createdAt, filters.createdTo));
     }
     if (filters.updatedFrom) {
-      where.push(gte(todosTable.updatedAt, filters.updatedFrom));
+      dateConditions.push(gte(todosTable.updatedAt, filters.updatedFrom));
     }
     if (filters.updatedTo) {
-      where.push(lte(todosTable.updatedAt, filters.updatedTo));
+      dateConditions.push(lte(todosTable.updatedAt, filters.updatedTo));
     }
-    const rows = this.db.select().from(todosTable).where(and(...where)).limit(limit).all();
+    const nonDateExpr = nonDateConditions.length ? and(...nonDateConditions) : undefined;
+    const dateExpr = dateConditions.length ? and(...dateConditions) : undefined;
+
+    // 非日付条件(title/status)と日付条件を OR で束ね、projectId は baseWhere で AND 固定
+    const additionalWhere =
+      nonDateExpr && dateExpr
+        ? [or(nonDateExpr, dateExpr)]
+        : [nonDateExpr, dateExpr].filter((expr): expr is NonNullable<typeof nonDateExpr> => Boolean(expr));
+    const whereExpr = and(...baseWhere, ...additionalWhere);
+
+    const rows = this.db.select().from(todosTable).where(whereExpr).limit(limit).all();
     return Promise.resolve(rows.map(this.mapTodo));
   }
 
