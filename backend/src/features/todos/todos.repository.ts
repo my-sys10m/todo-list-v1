@@ -85,6 +85,7 @@ export class TodosRepository {
   search(
     userId: string,
     filters: {
+      projectId?: string;
       title?: string;
       status?: TodoStatus;
       createdFrom?: string;
@@ -95,6 +96,9 @@ export class TodosRepository {
     limit: number,
   ): Promise<TodoEntity[]> {
     const where = [eq(todosTable.userId, userId), eq(todosTable.isDeleted, false)];
+    if (filters.projectId) {
+      where.push(eq(todosTable.projectId, Number(filters.projectId)));
+    }
     if (filters.title) {
       where.push(like(todosTable.title, `%${filters.title}%`));
     }
