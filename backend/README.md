@@ -33,6 +33,14 @@ npm run build && npm start
 npm test
 ```
 
+## Swagger ドキュメントのエクスポート（YAML/JSON）
+- サーバーを起動せずに Swagger スキーマを出力する場合  
+  ```bash
+  cd backend
+  npm run swagger:export
+  ```  
+  `docs/openapi.yaml` と `docs/openapi.json` に出力されます（Swagger UI は従来通り `/api/docs`）。
+
 ## Lint（開発時の品質チェック）
 - 依存を最新化したら `cd backend && npm install` を実行して ESLint 周りの dev 依存を取得。
 - チェックのみ:  
