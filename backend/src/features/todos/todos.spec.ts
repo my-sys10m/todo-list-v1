@@ -569,12 +569,12 @@ describe('search todo', () => {
       expect(search).toHaveBeenCalledWith(
         'user-1',
         expect.objectContaining({ createdTo: '2024-05-03T00:00:00.000Z' }),
-        51,
+        201,
       );
       expect(result).toEqual({ items: [] });
     });
 
-    it('returns mapped list when <= 50', async () => {
+    it('returns mapped list when <= 200', async () => {
       const entities: TodoEntity[] = [
         {
           id: '1',
@@ -595,7 +595,7 @@ describe('search todo', () => {
           createdFrom: '2024-05-01T00:00:00.000Z',
           updatedTo: '2024-05-02T00:00:00.000Z',
         }),
-        51,
+        201,
       );
       expect(result).toEqual({ items: entities });
     });
@@ -608,12 +608,12 @@ describe('search todo', () => {
         expect.objectContaining({
           projectId: '2',
         }),
-        51,
+        201,
       );
     });
 
-    it('throws BadRequest when more than 50 results', async () => {
-      const many = Array.from({ length: 51 }).map((_, i) => ({
+    it('throws BadRequest when more than 200 results', async () => {
+      const many = Array.from({ length: 201 }).map((_, i) => ({
         id: `${i}`,
         projectId: '1',
         userId: 'user-1',
