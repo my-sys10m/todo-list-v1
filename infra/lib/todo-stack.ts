@@ -51,6 +51,7 @@ export class TodoStack extends cdk.Stack {
       environment: {
         FIREBASE_PROJECT_ID: props.firebaseProjectId,
         SQLITE_PATH: props.sqlitePath,
+        FRONTEND_ORIGIN: props.frontendOrigin,
       },
     });
 
